@@ -33,21 +33,28 @@ namespace WpfApp
 
             LoginDialog.ShowDialog();
 
-
             using (ClientContext cont = new ClientContext("https://inblago.sharepoint.com"))
             {
 
-//                SecureString pass = new SecureString();
-//                foreach (char c in "password".ToCharArray()) pass.AppendChar(c);
+                string      login = LoginDialog.tb_Email.Text; ;
+                SecureString pass = LoginDialog.tb_password.SecurePassword;
 
-                cont.Credentials = new SharePointOnlineCredentials(LoginDialog.tb_Email.Text, LoginDialog.tb_password.SecurePassword);
+                //                SecureString pass = new SecureString();
+                //                foreach (char c in "password".ToCharArray()) pass.AppendChar(c);
+
+                cont.Credentials = new SharePointOnlineCredentials(login, pass);
                 Web oWeb = cont.Web;
                 cont.Load(oWeb);
+                cont.Load(cont.Web.CurrentUser);
                 List tasks = oWeb.Lists.GetByTitle("Tasks");
-                oWeb.Lists.RetrieveItems().Retrieve();
+                cont.ExecuteQuery();
 
                 CamlQuery caml = new Microsoft.SharePoint.Client.CamlQuery();
-                caml.ViewXml = "<View Scope='RecursiveAll' />";
+                caml.ViewXml = string.Format(@"<View Scope='RecursiveAll'>
+                    <Query><Where><And>
+                        <Eq><FieldRef Name = 'AssignedTo' LookupId = 'TRUE' /><Value Type = 'Lookup' >{0}</Value></Eq>
+                        <Neq><FieldRef Name = 'PercentComplete' /><Value Type='Number' >1.00</Value></Neq>
+                    </And></Where></Query></View>", cont.Web.CurrentUser.Id);
                 ListItemCollection items = tasks.GetItems(caml);
                 items.RetrieveItems().Retrieve();
                 cont.ExecuteQuery();
